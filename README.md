@@ -1,31 +1,72 @@
-## 🪿 HONC
+# Prompt Templates MCP Server
 
-This is a project created with the `create-honc-app` template. 
+A Model Context Protocol (MCP) server for managing prompt templates with dynamic variable substitution. This server provides tools for saving, updating, retrieving, and managing reusable prompt templates with automatic variable extraction.
 
-Learn more about the HONC stack on the [website](https://honc.dev) or the main [repo](https://github.com/fiberplane/create-honc-app).
+## Features
 
-There is also an [Awesome HONC collection](https://github.com/fiberplane/awesome-honc) with further guides, use cases and examples.
+- **Dynamic Variable Extraction**: Automatically detects `{variable}` placeholders in templates
+- **MCP Tools**: Full set of tools for template management accessible via MCP clients
+- **REST API**: HTTP endpoints for integration with external applications
+- **Persistent Storage**: Uses Cloudflare D1 database for reliable storage
+- **Variable Substitution**: Render templates with provided input values
 
-### Getting started
-[D1](https://developers.cloudflare.com/d1/) is Cloudflare's serverless SQL database. Running HONC with a D1 database involves two key steps: first, setting up the project locally, and second, deploying it in production. You can spin up your D1 database locally using Wrangler. If you're planning to deploy your application for production use, ensure that you have created a D1 instance in your Cloudflare account.
+## MCP Tools
 
-### Project structure
+The server exposes the following MCP tools:
 
-```#
-├── src
-│   ├── index.ts # Hono app entry point
-│   └── db
-│       └── schema.ts # Database schema
-├── .dev.vars.example # Example .dev.vars file
-├── .prod.vars.example # Example .prod.vars file
-├── seed.ts # Optional script to seed the db
-├── drizzle.config.ts # Drizzle configuration
-├── package.json
-├── tsconfig.json # TypeScript configuration
-└── wrangler.toml # Cloudflare Workers configuration
+1. **`save_prompt_template`** - Save new templates with automatic input extraction
+2. **`update_prompt_template`** - Modify existing templates  
+3. **`delete_prompt_template`** - Remove templates
+4. **`list_prompt_templates`** - View all saved templates
+5. **`get_prompt_by_name`** - Retrieve and render templates with input values
+
+### Example Usage
+
+```typescript
+// Save a template
+await save_prompt_template({
+  name: "greeting",
+  template: "Hello my name is {firstName} {lastName}. What is my name?"
+});
+// Automatically extracts: firstName, lastName as required inputs
+
+// Use the template
+await get_prompt_by_name({
+  name: "greeting",
+  inputs: {
+    firstName: "John",
+    lastName: "Doe"
+  }
+});
+// Returns: "Hello my name is John Doe. What is my name?"
 ```
 
-### Commands for local development
+## REST API Endpoints
+
+- `GET /prompts` - List all templates
+- `GET /prompts/:name` - Get a specific template
+- `POST /prompts` - Create a new template
+- `PUT /prompts/:name` - Update a template
+- `DELETE /prompts/:name` - Delete a template
+
+## Getting Started
+
+This project uses the HONC stack (Hono + Cloudflare) with D1 database for storage.
+
+### Project Structure
+
+```
+├── src
+│   ├── index.ts          # MCP server & API endpoints
+│   └── db
+│       └── schema.ts     # Database schema for prompt templates
+├── wrangler.toml         # Cloudflare Workers configuration
+├── drizzle.config.ts     # Drizzle ORM configuration
+├── package.json
+└── tsconfig.json
+```
+
+### Local Development
 
 Run the migrations and (optionally) seed the database:
 
@@ -47,7 +88,7 @@ npm run db:generate
 npm run db:migrate
 ```
 
-### Commands for deployment
+### Deployment
 
 Before deploying your worker to Cloudflare, ensure that you have a running D1 instance on Cloudflare to connect your worker to.
 
@@ -90,13 +131,92 @@ npm run db:migrate:prod
 Change the name of the project in `wrangler.toml` to something appropriate for your project:
 
 ```toml
-name = "my-d1-project"
+name = "prompt-templates-mcp"
 ```
 
-Finally, deploy your worker
+Finally, deploy your worker:
 
 ```shell 
 npm run deploy
 ```
+
+## Database Schema
+
+The server uses a simple schema to store prompt templates:
+
+```typescript
+promptTemplates {
+  id: integer (primary key)
+  name: text (unique)
+  template: text
+  inputs: text (JSON array of required variables)
+  createdAt: text
+  updatedAt: text
+}
+```
+
+## Setting up the MCP Server in Claude Desktop
+
+After deploying your server, follow these steps to connect it to Claude Desktop:
+
+1. **Open Claude Desktop Configuration**
+   - On macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - On Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
+2. **Add your MCP server to the configuration file:**
+
+```json
+{
+  "mcpServers": {
+    "prompt-templates": {
+      "command": "npx",
+      "args": [
+        "@modelcontextprotocol/server-fetch",
+        "https://YOUR-WORKER-URL/mcp"
+      ]
+    }
+  }
+}
+```
+
+Replace `YOUR-WORKER-URL` with your deployed Cloudflare Worker URL.
+
+3. **Restart Claude Desktop** completely (quit and reopen the application)
+
+4. **Verify the connection** by looking for the 🔌 icon in Claude Desktop, which indicates MCP servers are connected
+
+## Testing Your MCP Server
+
+Once connected, you can use these tools in your conversations:
+
+**Save a template:**
+```
+Use the save_prompt_template tool to save this template:
+- Name: "greeting"
+- Description: "A personalized greeting template"
+- Template: "Hello my name is {firstName} {lastName}. What is my name?"
+```
+
+**List your templates:**
+```
+Use the list_prompt_templates tool to show me all saved templates
+```
+
+**Use a template:**
+```
+Use the get_prompt_by_name tool with:
+- Name: "greeting"
+- Inputs: {"firstName": "John", "lastName": "Doe"}
+```
+
+The server will automatically extract variables from any template you save (like `{firstName}` and `{lastName}` from your example) and make them available as structured inputs.
+
+## Built With
+
+- [Hono](https://hono.dev/) - Web framework
+- [Cloudflare Workers](https://workers.cloudflare.com/) - Serverless platform
+- [Cloudflare D1](https://developers.cloudflare.com/d1/) - SQLite database
+- [Drizzle ORM](https://orm.drizzle.team/) - TypeScript ORM
+- [Model Context Protocol](https://modelcontextprotocol.io/) - AI tool integration protocol
 
 
